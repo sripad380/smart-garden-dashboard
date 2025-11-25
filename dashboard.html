@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Smart Garden ESP32 Control</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; }
+  h1 { font-size: 20px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+  .card { border: 1px solid #ccc; border-radius: 8px; padding: 12px; }
+  .row { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+  .badge { padding: 2px 8px; border-radius: 999px; background: #eee; font-size: 12px; }
+  .ok { background: #d8ffd8; } .warn { background: #ffe6b8; }
+</style>
+</head>
+<body>
+<h1>Smart Garden ESP32</h1>
+<div class="row">
+  <button id="connect">Connect</button>
+  <span id="status" class="badge">Disconnected</span>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>Telemetry</h2>
+    <div class="row"><span>Soil:</span><b id="m">—</b></div>
+    <div class="row"><span>Light:</span><b id="l">—</b></div>
+    <div class="row"><span>Pump duty:</span><b id="p">—</b></div>
+    <div class="row"><span>Pump ON:</span><span id="p_on" class="badge">—</span></div>
+    <div class="row"><span>LED duty:</span><b id="s">—</b></div>
+    <div class="row"><span>LED ON:</span><span id="s_on" class="badge">—</span></div>
+    <div class="row"><span>Override:</span><span id="o" class="badge">—</span></div>
+  </div>
+
+  <div class="card">
+    <h2>Manual Controls</h2>
+    <div class="row"><button onclick="sendCmd('OVERRIDE_ON')">Override ON</button><button onclick="sendCmd('OVERRIDE_OFF')">Override OFF</button></div>
+    <div class="row"><button onclick="sendCmd('PUMP_ON')">Pump ON</button><button onclick="sendCmd('PUMP_OFF')">Pump OFF</button></div>
+    <div class="row"><button onclick="sendCmd('LED_ON')">LED ON</button><button onclick="sendCmd('LED_OFF')">LED OFF</button></div>
+    <div class="row">
+      <label>Pump duty:</label><input id="pumpDuty" type="number" min="0" max="255" value="180">
+      <button onclick="setPump()">Set</button>
+    </div>
+    <div class="row">
+      <label>LED duty:</label><input id="ledDuty" type="number" min="0" max="255" value="255">
+      <button onclick="setLed()">Set</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Thresholds</h2>
+    <div class="row"><label>Moisture:</label><input id="moist" type="number" min="0" max="4095" value="2500"><button onclick="setThresh('SET_MOISTURE_THRESH', 'moist')">Apply</button></div>
+    <div class="row"><label>Light:</label><input id="light" type="number" min="0" max="4095" value="1000"><button onclick="setThresh('SET_LIGHT_THRESH', 'light')">Apply</button></div>
+  </div>
+</div>
+
+<script>
+const NAME = "SmartGardenESP32";
+const SERVICE = "4e520001-3c8c-4824-8f7d-2b4421d8b63e";
+const DATA    = "4e520002-3c8c-4824-8f7d-2b4421d8b63e";
+const CMD     = "4e520003-3c8c-4824-8f7d-2b4421d8b63e";
+let cmdChar, dataChar;
+
+const $ = id => document.getElementById(id);
+const setStatus = c => { $("status").textContent = c ? "Connected" : "Disconnected"; $("status").className = "badge " + (c ? "ok" : ""); };
+
+$("connect").onclick = async () => {
+  try {
+    const dev = await navigator.bluetooth.requestDevice({ filters: [{ name: NAME }], optionalServices: [SERVICE] });
+    const server = await dev.gatt.connect();
+    const svc = await server.getPrimaryService(SERVICE);
+    dataChar = await svc.getCharacteristic(DATA);
+    cmdChar  = await svc.getCharacteristic(CMD);
+    await dataChar.startNotifications();
+    dataChar.addEventListener("characteristicvaluechanged", e => {
+      const txt = new TextDecoder().decode(e.target.value);
+      try {
+        const o = JSON.parse(txt);
+        $("m").textContent = o.M;
+        $("l").textContent = o.L;
+        $("p").textContent = o.P;
+        $("s").textContent = o.S;
+        $("p_on").textContent = o.P_ON ? "ON" : "OFF";
+        $("p_on").className = "badge " + (o.P_ON ? "ok" : "");
+        $("s_on").textContent = o.S_ON ? "ON" : "OFF";
+        $("s_on").className = "badge " + (o.S_ON ? "ok" : "");
+        $("o").textContent = o.O ? "ON" : "OFF";
+        $("o").className = "badge " + (o.O ? "warn" : "");
+      } catch (err) { console.warn("Bad JSON:", txt, err); }
+    });
+    dev.addEventListener("gattserverdisconnected", () => setStatus(false));
+    setStatus(true);
+  } catch (err) {
+    alert("Connect failed: " + err);
+    setStatus(false);
+  }
+};
+
+async function sendCmd(s) {
+  if (!cmdChar) return alert("Not connected");
+  await cmdChar.writeValue(new TextEncoder().encode(s));
+}
+function setPump() {
+  const v = parseInt($("pumpDuty").value, 10);
+  if (isNaN(v) || v < 0 || v > 255) return alert("Pump duty 0–255");
+  sendCmd("SET_PUMP_SPEED:" + v);
+}
+function setLed() {
+  const v = parseInt($("ledDuty").value, 10);
+  if (isNaN(v) || v < 0 || v > 255) return alert("LED duty 0–255");
+  sendCmd("SET_LED_BRIGHTNESS:" + v);
+}
+function setThresh(cmd, id) {
+  const val = document.getElementById(id).value;
+  sendCmd(cmd + ":" + val);
+}
+</script>
+</body>
+</html>

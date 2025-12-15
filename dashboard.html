@@ -474,6 +474,37 @@ let writeInProgress = false;
  * Process the queue sequentially. Each queued item is { data, resolve, reject }.
  * Small pause between writes gives the peripheral time to process; adjust delay if needed.
  */
+// Improved write queue with retry/backoff
+const writeQueue = [];
+let writeInProgress = false;
+
+async function doWrite(characteristic, data, tryCount = 0) {
+  // choose method
+  if (!characteristic) throw new Error("Characteristic not available");
+  try {
+    if (characteristic.properties.writeWithoutResponse && typeof characteristic.writeValueWithoutResponse === 'function') {
+      // Some implementations return a Promise — await if so
+      const p = characteristic.writeValueWithoutResponse(data);
+      if (p && typeof p.then === 'function') await p;
+    } else if (characteristic.properties.write && typeof characteristic.writeValue === 'function') {
+      await characteristic.writeValue(data);
+    } else {
+      throw new Error("Characteristic not writable");
+    }
+    return;
+  } catch (err) {
+    // handle transient GATT-in-progress by retrying
+    const msg = (err && err.message) ? err.message : String(err);
+    if ((/GATT operation already in progress/i.test(msg) || /operation failed/i.test(msg)) && tryCount < 4) {
+      // exponential backoff
+      const delayMs = 50 + Math.pow(2, tryCount) * 30;
+      await new Promise(r => setTimeout(r, delayMs));
+      return doWrite(characteristic, data, tryCount + 1);
+    }
+    throw err;
+  }
+}
+
 async function processWriteQueue() {
   if (writeInProgress) return;
   writeInProgress = true;
@@ -481,27 +512,18 @@ async function processWriteQueue() {
     const item = writeQueue.shift();
     const { data, resolve, reject } = item;
     try {
-      if (!cmdChar) throw new Error("Command characteristic not available");
-      if (cmdChar.properties.write) {
-        await cmdChar.writeValue(data);
-      } else if (cmdChar.properties.writeWithoutResponse && typeof cmdChar.writeValueWithoutResponse === 'function') {
-        await cmdChar.writeValueWithoutResponse(data);
-      } else {
-        throw new Error("Command characteristic not writable");
-      }
+      await doWrite(cmdChar, data); // cmdChar is your command characteristic
       resolve();
     } catch (err) {
+      console.error("write failed:", err);
       reject(err);
     }
-    // small delay between writes to avoid overwhelming the peripheral
-    await new Promise(r => setTimeout(r, 50));
+    // small delay between writes to avoid hammering peripheral
+    await new Promise(r => setTimeout(r, 60));
   }
   writeInProgress = false;
 }
 
-/**
- * Enqueue a command string. Returns a promise that resolves when the write completes.
- */
 function enqueueWrite(cmd) {
   return new Promise((resolve, reject) => {
     try {

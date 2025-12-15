@@ -466,6 +466,54 @@ function isWebBluetoothSupported() {
   return !!(navigator && navigator.bluetooth);
 }
 
+/* ---------- BLE write queue to avoid "GATT operation already in progress" ---------- */
+const writeQueue = [];
+let writeInProgress = false;
+
+/**
+ * Process the queue sequentially. Each queued item is { data, resolve, reject }.
+ * Small pause between writes gives the peripheral time to process; adjust delay if needed.
+ */
+async function processWriteQueue() {
+  if (writeInProgress) return;
+  writeInProgress = true;
+  while (writeQueue.length > 0) {
+    const item = writeQueue.shift();
+    const { data, resolve, reject } = item;
+    try {
+      if (!cmdChar) throw new Error("Command characteristic not available");
+      if (cmdChar.properties.write) {
+        await cmdChar.writeValue(data);
+      } else if (cmdChar.properties.writeWithoutResponse && typeof cmdChar.writeValueWithoutResponse === 'function') {
+        await cmdChar.writeValueWithoutResponse(data);
+      } else {
+        throw new Error("Command characteristic not writable");
+      }
+      resolve();
+    } catch (err) {
+      reject(err);
+    }
+    // small delay between writes to avoid overwhelming the peripheral
+    await new Promise(r => setTimeout(r, 50));
+  }
+  writeInProgress = false;
+}
+
+/**
+ * Enqueue a command string. Returns a promise that resolves when the write completes.
+ */
+function enqueueWrite(cmd) {
+  return new Promise((resolve, reject) => {
+    try {
+      const data = new TextEncoder().encode(cmd);
+      writeQueue.push({ data, resolve, reject });
+      processWriteQueue();
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
 /* ---------- Connect ---------- */
 connectBtn.addEventListener("click", async () => {
   if (!isWebBluetoothSupported()) {
@@ -667,27 +715,20 @@ function updateUIFromData(d) {
   }
 }
 
-/* ---------- Safe write helper (handles write vs writeWithoutResponse) ---------- */
+/* ---------- sendCmd replaced with queued writer (uses enqueueWrite) ---------- */
 async function sendCmd(cmd) {
   if (!cmdChar) {
     alert("Not connected!");
     return;
   }
   try {
-    const data = new TextEncoder().encode(cmd);
-    if (cmdChar.properties.write) {
-      await cmdChar.writeValue(data);
-    } else if (cmdChar.properties.writeWithoutResponse && typeof cmdChar.writeValueWithoutResponse === 'function') {
-      await cmdChar.writeValueWithoutResponse(data);
-    } else {
-      throw new Error("Characteristic not writable");
-    }
-    logBLE("Sent: " + cmd);
+    await enqueueWrite(cmd);
+    logBLE("Sent (queued): " + cmd);
   } catch (err) {
-    console.error("Write failed:", err);
-    alert("Failed to send command: " + (err.message || err));
-    // If disconnected, try to reconnect
-    if (device && !device.gatt.connected) {
+    console.error("Failed to send command:", err);
+    alert("Failed to send command: " + (err && err.message ? err.message : err));
+    // If disconnected, try to reconnect in background
+    if (device && (!device.gatt || !device.gatt.connected)) {
       tryReconnect().catch(() => {});
     }
   }
@@ -747,7 +788,7 @@ pumpToggle.addEventListener("change", () => {
   }
 });
 
-/* ---------- LED Slider UI and interaction ---------- */
+/* ---------- LED Slider UI and interaction (with debounce) ---------- */
 function setLEDSliderUI(value) {
   currentLEDVal = clamp(Math.round(value), 0, 255);
   const pct = Math.round((currentLEDVal / 255) * 100);
@@ -767,6 +808,15 @@ function sendLEDVal() {
   }
 }
 
+// Debounce sending while dragging so we don't queue too many writes
+let ledSendDebounceTimer = null;
+function scheduleSendLED(debounceMs = 120) {
+  clearTimeout(ledSendDebounceTimer);
+  ledSendDebounceTimer = setTimeout(() => {
+    sendLEDVal();
+  }, debounceMs);
+}
+
 ledThumb.addEventListener("pointerdown", e => {
   e.preventDefault();
   isDraggingLED = true;
@@ -781,11 +831,15 @@ window.addEventListener("pointermove", e => {
   const pct = clamp(Math.round((1 - (y / rect.height)) * 100), 0, 100);
   const val = Math.round((pct / 100) * 255);
   setLEDSliderUI(val);
+  // schedule a debounced send while dragging
+  scheduleSendLED(120);
 });
 window.addEventListener("pointerup", e => {
   if (isDraggingLED) {
     isDraggingLED = false;
     try { ledThumb.releasePointerCapture(e.pointerId); } catch {}
+    // send final value immediately
+    clearTimeout(ledSendDebounceTimer);
     sendLEDVal();
   }
 });
@@ -861,11 +915,12 @@ knob.addEventListener("keydown", (e) => {
 ledThumb.addEventListener("keydown", (e) => {
   if (e.key === "ArrowDown" || e.key === "ArrowLeft") {
     setLEDSliderUI(currentLEDVal - 5);
-    sendLEDVal();
+    // schedule or send immediately
+    scheduleSendLED(80);
     e.preventDefault();
   } else if (e.key === "ArrowUp" || e.key === "ArrowRight") {
     setLEDSliderUI(currentLEDVal + 5);
-    sendLEDVal();
+    scheduleSendLED(80);
     e.preventDefault();
   }
 });

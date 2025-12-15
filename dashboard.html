@@ -44,27 +44,31 @@ h2, h3 {
   cursor: pointer;
 }
 
-/* ---------- iOS-style toggle ---------- */
+/* ---------- iOS-style toggle (pure CSS) ---------- */
 .toggle-wrapper {
   display: flex;
   align-items: center;
   gap: 8px;
   margin: 6px 0 12px;
 }
+
 .toggle-label-text {
   font-weight: bold;
   min-width: 140px;
 }
+
 .toggle {
   position: relative;
   width: 50px;
   height: 28px;
 }
+
 .toggle input {
   opacity: 0;
   width: 0;
   height: 0;
 }
+
 .toggle-slider {
   position: absolute;
   cursor: pointer;
@@ -76,6 +80,7 @@ h2, h3 {
   border-radius: 34px;
   transition: 0.3s;
 }
+
 .toggle-slider::before {
   position: absolute;
   content: "";
@@ -88,14 +93,18 @@ h2, h3 {
   transition: 0.3s;
   box-shadow: 0 1px 3px #0004;
 }
+
 .toggle input:checked + .toggle-slider {
   background-color: #4CAF50;
 }
+
 .toggle input:checked + .toggle-slider::before {
   transform: translateX(22px);
 }
 
 /* ---------- Environment visuals ---------- */
+
+/* Temperature thermometer */
 .thermo {
   width: 60px;
   height: 200px;
@@ -113,6 +122,7 @@ h2, h3 {
   transition: height 0.3s;
 }
 
+/* Humidity droplet */
 .humidity-icon {
   width: 80px;
   height: 110px;
@@ -134,9 +144,16 @@ h2, h3 {
   width: 100%;
   height: 0%;
   background: #0288d1;
+  animation: humidityPulse 2s infinite ease-in-out;
   transition: height 0.3s;
 }
+@keyframes humidityPulse {
+  0%   { opacity: 0.8; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.8; }
+}
 
+/* Soil wetness */
 .soil-box {
   width: 120px;
   height: 120px;
@@ -147,6 +164,18 @@ h2, h3 {
   overflow: hidden;
   background: #f3e5ab;
 }
+.soil-dots {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-image:
+    radial-gradient(#8d6e63 2px, transparent 2px),
+    radial-gradient(#795548 2px, transparent 2px),
+    radial-gradient(#6d4c41 2px, transparent 2px);
+  background-size: 12px 12px, 18px 18px, 15px 15px;
+  background-position: 0 0, 5px 10px, 10px 5px;
+  opacity: 0.8;
+}
 .soil-water {
   position: absolute;
   bottom: 0;
@@ -156,6 +185,7 @@ h2, h3 {
   transition: height 0.4s ease;
 }
 
+/* Light sensor sun-style horizontal meter */
 .sun-meter-box {
   width: 220px;
   height: 30px;
@@ -165,6 +195,7 @@ h2, h3 {
   position: relative;
   overflow: hidden;
   border: 2px solid #ffca28;
+  box-shadow: 0 0 10px #ffeb3b inset;
 }
 .sun-meter-fill {
   position: absolute;
@@ -181,13 +212,14 @@ h2, h3 {
   transition: width 0.4s ease;
 }
 
-/* ---------- Speedometer ---------- */
+/* ---------- Pump speedometer ---------- */
 .speedometer-container {
   width: 260px;
   height: 140px;
   margin: 15px auto 5px;
   position: relative;
 }
+
 .speedometer-arc {
   width: 100%;
   height: 100%;
@@ -199,7 +231,10 @@ h2, h3 {
     #ffeb3b
   );
   mask: radial-gradient(circle at 50% 100%, transparent 58%, black 59%);
+  -webkit-mask: radial-gradient(circle at 50% 100%, transparent 58%, black 59%);
 }
+
+/* background for ticks/inner */
 .speedometer-inner {
   position: absolute;
   left: 15px;
@@ -209,6 +244,16 @@ h2, h3 {
   border-radius: 260px 260px 0 0;
   background: #222;
   mask: radial-gradient(circle at 50% 100%, transparent 58%, black 59%);
+  -webkit-mask: radial-gradient(circle at 50% 100%, transparent 58%, black 59%);
+}
+
+/* tick marks */
+.speedometer-ticks {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
 }
 .speedometer-ticks div {
   position: absolute;
@@ -217,8 +262,10 @@ h2, h3 {
   background: #eee;
   left: 50%;
   top: 18px;
-  transform-origin: center 90px;
+  transform-origin: center 90px; /* pivot near center of arc */
 }
+
+/* needle */
 .speedometer-needle {
   position: absolute;
   left: 50%;
@@ -229,7 +276,9 @@ h2, h3 {
   transform-origin: center bottom;
   transform: rotate(-90deg);
   transition: transform 0.15s linear;
+  pointer-events: none;
 }
+
 .speedometer-knob {
   position: absolute;
   left: 50%;
@@ -240,15 +289,25 @@ h2, h3 {
   background: #f5f5f5;
   border: 3px solid #ffeb3b;
   transform: translateX(-50%) translateY(12px);
+  box-shadow: 0 0 6px #0008;
   cursor: grab;
 }
+
+/* numeric display */
 .speedometer-value {
   text-align: center;
   margin-top: 4px;
   font-weight: bold;
 }
 
-/* ---------- Vertical LED slider ---------- */
+/* ---------- Vertical LED brightness slider ---------- */
+.vertical-slider-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
 .vertical-slider-box {
   width: 40px;
   height: 180px;
@@ -260,6 +319,7 @@ h2, h3 {
 .vertical-slider-fill {
   position: absolute;
   bottom: 0;
+  left: 0;
   width: 100%;
   height: 0%;
   background: linear-gradient(to top, #ffcc80, #ff9800);
@@ -272,17 +332,37 @@ h2, h3 {
   height: 10px;
   background: #ffffff;
   border-radius: 6px;
+  box-shadow: 0 0 5px #0005;
   transform: translateX(-50%) translateY(50%);
   cursor: grab;
 }
 
-/* ---------- Mobile Responsive ---------- */
-@media (max-width: 768px) {
-  body { padding: 10px; }
-  .cards-row { flex-direction: column; }
-  .speedometer-container { width: 200px; height: 110px; }
-  .vertical-slider-box { height: 150px; }
+/* ---------- Threshold inputs ---------- */
+.threshold-row {
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
+.threshold-row input[type=number] {
+  width: 80px;
+  padding: 4px;
+}
+.threshold-row button {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: #1976d2;
+  color: white;
+  cursor: pointer;
+}
+
+/* ---------- Misc ---------- */
+.small-label {
+  font-size: 12px;
+  color: #666;
+}
+
 </style>
 </head>
 
@@ -294,38 +374,41 @@ h2, h3 {
 <!-- ENVIRONMENT CARD -->
 <div class="card">
   <h3>Environment</h3>
-  <div style="display:flex; justify-content:space-around; flex-wrap:wrap;">
+  <div style="display:flex; justify-content:space-around; align-items:flex-start; flex-wrap:wrap;">
 
     <!-- Temperature -->
-    <div style="text-align:center;">
-      <h4>Temperature</h4>
-      <div class="thermo"><div class="thermo-fill" id="thermoFill"></div></div>
-      <p><b><span id="temp">--</span> °C</b></p>
+    <div style="text-align:center; margin:10px;">
+      <h4>Temperature (0–100)</h4>
+      <div class="thermo">
+        <div class="thermo-fill" id="thermoFill"></div>
+      </div>
+      <p><b><span id="temp">--</span> °</b></p>
     </div>
 
     <!-- Humidity -->
-    <div style="text-align:center;">
-      <h4>Humidity</h4>
+    <div style="text-align:center; margin:10px;">
+      <h4>Humidity (0–100)</h4>
       <div class="humidity-icon">
         <div class="humidity-drop">
           <div class="humidity-fill" id="humidityFill"></div>
         </div>
       </div>
-      <p><b><span id="hum">--</span>%</b></p>
+      <p><b><span id="hum">--</span> %</b></p>
     </div>
 
-    <!-- Soil -->
-    <div style="text-align:center;">
-      <h4>Soil Moisture</h4>
+    <!-- Soil Wetness -->
+    <div style="text-align:center; margin:10px;">
+      <h4>Soil Wetness (0–100%)</h4>
       <div class="soil-box">
         <div class="soil-water" id="soilWater"></div>
+        <div class="soil-dots"></div>
       </div>
       <p><b><span id="soilPercent">--</span>%</b></p>
     </div>
 
-    <!-- Light -->
-    <div style="text-align:center;">
-      <h4>Light Level</h4>
+    <!-- Light Sensor -->
+    <div style="text-align:center; margin:10px;">
+      <h4>Light Level (0–100%)</h4>
       <div class="sun-meter-box">
         <div class="sun-meter-fill" id="lightMeter"></div>
       </div>
@@ -337,10 +420,11 @@ h2, h3 {
 
 <div class="cards-row">
 
-  <!-- PUMP CONTROL -->
+  <!-- PUMP CONTROL CARD -->
   <div class="card card-half">
     <h3>Pump Control</h3>
 
+    <!-- Pump toggle -->
     <div class="toggle-wrapper">
       <div class="toggle-label-text">Pump Power</div>
       <label class="toggle">
@@ -348,24 +432,27 @@ h2, h3 {
         <span class="toggle-slider"></span>
       </label>
     </div>
+    <div class="small-label">Toggle controls ON/OFF, speedometer sets speed (0–255).</div>
 
+    <!-- Speedometer -->
     <div class="speedometer-container" id="speedometer">
       <div class="speedometer-arc"></div>
       <div class="speedometer-inner"></div>
       <div class="speedometer-ticks" id="speedometerTicks"></div>
+
       <div class="speedometer-needle" id="speedometerNeedle"></div>
       <div class="speedometer-knob" id="speedometerKnob"></div>
     </div>
-
     <div class="speedometer-value">
-      Pump Speed: <span id="pumpSpeedVal">0</span>
+      Pump Speed: <span id="pumpSpeedVal">0</span> (0–255)
     </div>
   </div>
 
-  <!-- LED CONTROL -->
+  <!-- LED CONTROL CARD -->
   <div class="card card-half">
     <h3>LED Grow Light</h3>
 
+    <!-- LED toggle -->
     <div class="toggle-wrapper">
       <div class="toggle-label-text">LED Power</div>
       <label class="toggle">
@@ -373,32 +460,36 @@ h2, h3 {
         <span class="toggle-slider"></span>
       </label>
     </div>
+    <div class="small-label">Toggle controls ON/OFF, slider sets brightness (0–255).</div>
 
-    <div class="vertical-slider-box" id="ledSliderBox">
-      <div class="vertical-slider-fill" id="ledSliderFill"></div>
-      <div class="vertical-slider-thumb" id="ledSliderThumb"></div>
-    </div>
-
-    <div style="text-align:center;">
-      Brightness: <b><span id="ledVal">0</span></b>
+    <!-- Vertical brightness slider -->
+    <div class="vertical-slider-wrapper">
+      <div class="vertical-slider-box" id="ledSliderBox">
+        <div class="vertical-slider-fill" id="ledSliderFill"></div>
+        <div class="vertical-slider-thumb" id="ledSliderThumb"></div>
+      </div>
+      <div><b>Brightness: <span id="ledVal">0</span></b></div>
     </div>
   </div>
 
 </div>
 
-<!-- MANUAL OVERRIDE -->
+<!-- MANUAL OVERDRIVE CARD -->
 <div class="card">
-  <h3>Manual Override</h3>
+  <h3>Manual Overdrive</h3>
   <div class="toggle-wrapper">
-    <div class="toggle-label-text">Override</div>
+    <div class="toggle-label-text">Manual Overdrive</div>
     <label class="toggle">
       <input type="checkbox" id="overdriveToggle">
       <span class="toggle-slider"></span>
     </label>
   </div>
+  <div class="small-label">
+    When enabled, automation is disabled and manual controls (pump, LED, etc.) take priority.
+  </div>
 </div>
 
-<!-- THRESHOLDS -->
+<!-- THRESHOLDS CARD -->
 <div class="card">
   <h3>Automation Thresholds</h3>
 
@@ -409,11 +500,22 @@ h2, h3 {
   </div>
 
   <div class="threshold-row">
+    <span><b>Temperature High Threshold:</b></span>
+    <input type="number" id="tempThresh" />
+    <button onclick="sendThreshold('SET_TEMP_THRESH')">Set</button>
+  </div>
+
+  <div class="threshold-row">
+    <span><b>Humidity Low Threshold:</b></span>
+    <input type="number" id="humThresh" />
+    <button onclick="sendThreshold('SET_HUM_THRESH')">Set</button>
+  </div>
+
+  <div class="threshold-row">
     <span><b>Light Low Threshold:</b></span>
     <input type="number" id="lightThresh" />
     <button onclick="sendThreshold('SET_LIGHT_THRESH')">Set</button>
   </div>
-
 </div>
 
 <script>
@@ -454,28 +556,34 @@ function handleNotify(event) {
     const d = JSON.parse(text);
 
     /* Temperature */
-    document.getElementById("temp").innerText = d.T.toFixed(1);
-    document.getElementById("thermoFill").style.height = d.T + "%";
+    const temp = clamp(d.T, 0, 100);
+    document.getElementById("temp").innerText = temp.toFixed(0);
+    document.getElementById("thermoFill").style.height = temp + "%";
 
     /* Humidity */
-    document.getElementById("hum").innerText = d.H.toFixed(1);
-    document.getElementById("humidityFill").style.height = d.H + "%";
+    const hum = clamp(d.H, 0, 100);
+    document.getElementById("hum").innerText = hum.toFixed(0);
+    document.getElementById("humidityFill").style.height = hum + "%";
 
-    /* Soil */
-    let soilPercent = (d.M / 4095) * 100;
+    /* Soil wetness: assume raw 0–3500 → 0–100% */
+    let soilRaw = d.M;
+    let soilPercent = clamp((soilRaw / 3500) * 100, 0, 100);
     document.getElementById("soilPercent").innerText = soilPercent.toFixed(0);
     document.getElementById("soilWater").style.height = soilPercent + "%";
 
-    /* Light */
-    let lightPercent = (d.L / 4095) * 100;
+    /* Light sensor: raw 0–4096 → 0–100% */
+    let lightRaw = d.L;
+    let lightPercent = clamp((lightRaw / 4096) * 100, 0, 100);
     document.getElementById("lightPercent").innerText = lightPercent.toFixed(0);
     document.getElementById("lightMeter").style.width = lightPercent + "%";
 
-    /* Pump speed */
-    setPumpSpeedUI(d.P);
+    /* Pump speed (0–255) -> update speedometer + display */
+    let pumpSpeed = clamp(d.P, 0, 255);
+    setPumpSpeedUI(pumpSpeed);
 
-    /* LED brightness */
-    setLEDSliderUI(d.S);
+    /* LED brightness (0–255) -> update vertical slider */
+    let ledVal = clamp(d.S, 0, 255);
+    setLEDSliderUI(ledVal);
 
   } catch (err) {
     console.log("Invalid JSON:", text);
@@ -488,68 +596,118 @@ function clamp(v, min, max) {
 }
 
 async function sendCmd(cmd) {
-  if (!cmdChar) return alert("Not connected!");
-  await cmdChar.writeValue(new TextEncoder().encode(cmd));
+  if (!cmdChar) {
+    alert("Not connected!");
+    return;
+  }
+  try {
+    await cmdChar.writeValue(new TextEncoder().encode(cmd));
+  } catch (e) {
+    console.log("sendCmd error:", e);
+  }
 }
 
-/* ---------- Pump Speedometer ---------- */
+/* ---------- Pump speedometer logic ---------- */
+
 const needle = document.getElementById("speedometerNeedle");
 const knob = document.getElementById("speedometerKnob");
 const speedDisplay = document.getElementById("pumpSpeedVal");
 const pumpToggle = document.getElementById("pumpToggle");
 
 let isDraggingNeedle = false;
-let currentPumpSpeed = 0;
+let currentPumpSpeed = 0; // 0–255
 
+// create tick marks (0–180 deg every 15 deg)
+(function createTicks() {
+  const ticksContainer = document.getElementById("speedometerTicks");
+  const steps = 12; // 0..180 step 15
+  for (let i = 0; i <= steps; i++) {
+    const tick = document.createElement("div");
+    const angle = -90 + (i * (180 / steps)); // -90..+90
+    tick.style.transform = `rotate(${angle}deg) translateX(-50%)`;
+    ticksContainer.appendChild(tick);
+  }
+})();
+
+/* Map speed (0–255) to angle (-90..+90) */
 function speedToAngle(speed) {
   return -90 + (speed / 255) * 180;
 }
+
+/* Map angle (-90..+90) to speed (0..255) */
 function angleToSpeed(angle) {
-  return Math.round(((angle + 90) / 180) * 255);
+  const clamped = clamp(angle, -90, 90);
+  return Math.round(((clamped + 90) / 180) * 255);
 }
 
 function setPumpSpeedUI(speed) {
   currentPumpSpeed = clamp(speed, 0, 255);
-  needle.style.transform = `rotate(${speedToAngle(currentPumpSpeed)}deg)`;
+  const angle = speedToAngle(currentPumpSpeed);
+  needle.style.transform = `rotate(${angle}deg)`;
   speedDisplay.textContent = currentPumpSpeed;
 }
 
+/* send pump speed command if pump is ON */
 function sendPumpSpeed() {
-  if (pumpToggle.checked) sendCmd("SET_PUMP_SPEED:" + currentPumpSpeed);
+  if (pumpToggle.checked) {
+    sendCmd("SET_PUMP_SPEED:" + currentPumpSpeed);
+  }
 }
 
-knob.addEventListener("pointerdown", e => {
+/* dragging logic (must grab knob) */
+function onNeedlePointerDown(e) {
   e.preventDefault();
   isDraggingNeedle = true;
-});
-window.addEventListener("pointermove", e => {
+  knob.style.cursor = "grabbing";
+}
+
+function onNeedlePointerMove(e) {
   if (!isDraggingNeedle) return;
+
   const rect = knob.parentElement.getBoundingClientRect();
-  const cx = rect.left + rect.width / 2;
-  const cy = rect.bottom;
-  const x = e.clientX - cx;
-  const y = e.clientY - cy;
-  let angle = Math.atan2(x, -y) * (180 / Math.PI);
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.bottom; // bottom center as pivot
+
+  const x = e.clientX - centerX;
+  const y = e.clientY - centerY;
+
+  // angle from -90 (left) to +90 (right)
+  let angle = Math.atan2(-y, x) * (180 / Math.PI); // convert to degrees relative to +x
+  // but we want pivot at bottom pointing up. We approximate using geometry:
+  // compute angle relative to vertical:
+  angle = Math.atan2(x, -y) * (180 / Math.PI);
+
   angle = clamp(angle, -90, 90);
-  setPumpSpeedUI(angleToSpeed(angle));
-});
-window.addEventListener("pointerup", () => {
+
+  const newSpeed = angleToSpeed(angle);
+  setPumpSpeedUI(newSpeed);
+}
+
+function onNeedlePointerUp() {
   if (isDraggingNeedle) {
     isDraggingNeedle = false;
+    knob.style.cursor = "grab";
     sendPumpSpeed();
   }
-});
+}
 
+knob.addEventListener("pointerdown", onNeedlePointerDown);
+window.addEventListener("pointermove", onNeedlePointerMove);
+window.addEventListener("pointerup", onNeedlePointerUp);
+
+/* Pump toggle: ON/OFF */
 pumpToggle.addEventListener("change", () => {
   if (pumpToggle.checked) {
     sendCmd("PUMP_ON");
+    // also send speed
     sendPumpSpeed();
   } else {
     sendCmd("PUMP_OFF");
   }
 });
 
-/* ---------- LED Slider ---------- */
+/* ---------- LED vertical slider logic ---------- */
+
 const ledSliderBox = document.getElementById("ledSliderBox");
 const ledFill = document.getElementById("ledSliderFill");
 const ledThumb = document.getElementById("ledSliderThumb");
@@ -557,7 +715,90 @@ const ledValLabel = document.getElementById("ledVal");
 const ledToggle = document.getElementById("ledToggle");
 
 let isDraggingLED = false;
-let currentLEDVal = 0;
+let currentLEDVal = 0; // 0–255
 
 function setLEDSliderUI(value) {
-  currentLEDVal = clamp(value,
+  currentLEDVal = clamp(value, 0, 255);
+  const pct = (currentLEDVal / 255) * 100;
+  ledFill.style.height = pct + "%";
+
+  const boxRect = ledSliderBox.getBoundingClientRect();
+  const thumbY = boxRect.height - (boxRect.height * pct / 100);
+  ledThumb.style.top = thumbY + "px";
+
+  ledValLabel.textContent = currentLEDVal;
+}
+
+/* send LED brightness if LED is ON */
+function sendLEDBrightness() {
+  if (ledToggle.checked) {
+    sendCmd("SET_LED_BRIGHTNESS:" + currentLEDVal);
+  }
+}
+
+function ledPointerToValue(e) {
+  const rect = ledSliderBox.getBoundingClientRect();
+  const y = e.clientY - rect.top;
+  const pct = clamp(1 - y / rect.height, 0, 1);
+  const val = Math.round(pct * 255);
+  setLEDSliderUI(val);
+}
+
+/* dragging behavior */
+ledThumb.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  isDraggingLED = true;
+  ledThumb.style.cursor = "grabbing";
+});
+
+window.addEventListener("pointermove", (e) => {
+  if (!isDraggingLED) return;
+  ledPointerToValue(e);
+});
+
+window.addEventListener("pointerup", () => {
+  if (isDraggingLED) {
+    isDraggingLED = false;
+    ledThumb.style.cursor = "grab";
+    sendLEDBrightness();
+  }
+});
+
+/* allow click on the slider box to jump brightness */
+ledSliderBox.addEventListener("pointerdown", (e) => {
+  ledPointerToValue(e);
+  sendLEDBrightness();
+});
+
+/* LED toggle */
+ledToggle.addEventListener("change", () => {
+  if (ledToggle.checked) {
+    sendCmd("LED_ON");
+    sendLEDBrightness();
+  } else {
+    sendCmd("LED_OFF");
+  }
+});
+
+/* ---------- Manual Overdrive toggle ---------- */
+const overdriveToggle = document.getElementById("overdriveToggle");
+
+overdriveToggle.addEventListener("change", () => {
+  if (overdriveToggle.checked) {
+    sendCmd("OVERDRIVE_ON");
+  } else {
+    sendCmd("OVERDRIVE_OFF");
+  }
+});
+
+/* ---------- Thresholds ---------- */
+function sendThreshold(cmd) {
+  const id = cmd.replace("SET_", "").toLowerCase() + "Thresh";
+  const val = document.getElementById(id).value;
+  if (val === "") return;
+  sendCmd(cmd + ":" + val);
+}
+</script>
+
+</body>
+</html>

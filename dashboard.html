@@ -1,119 +1,804 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<title>Smart Garden ESP32 Control</title>
+<meta charset="UTF-8" />
+<title>Smart Garden Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <style>
-  body { font-family: Arial, sans-serif; margin: 20px; }
-  h1 { font-size: 20px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
-  .card { border: 1px solid #ccc; border-radius: 8px; padding: 12px; }
-  .row { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
-  .badge { padding: 2px 8px; border-radius: 999px; background: #eee; font-size: 12px; }
-  .ok { background: #d8ffd8; } .warn { background: #ffe6b8; }
+/* ---------- Global ---------- */
+body {
+  font-family: Arial, sans-serif;
+  background: #eef2f3;
+  padding: 20px;
+  margin: 0;
+}
+h2, h3 {
+  margin-top: 0;
+}
+.card {
+  background: #ffffff;
+  padding: 15px;
+  margin-bottom: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 5px #0002;
+}
+.cards-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+.card-half {
+  flex: 1 1 320px;
+}
+
+/* ---------- Connect button ---------- */
+#connectBtn {
+  padding: 10px 16px;
+  margin: 10px 0 20px;
+  background: #4CAF50;
+  border: none;
+  color: white;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* ---------- iOS-style toggle (pure CSS) ---------- */
+.toggle-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 12px;
+}
+
+.toggle-label-text {
+  font-weight: bold;
+  min-width: 140px;
+}
+
+.toggle {
+  position: relative;
+  width: 50px;
+  height: 28px;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  border-radius: 34px;
+  transition: 0.3s;
+}
+
+.toggle-slider::before {
+  position: absolute;
+  content: "";
+  height: 22px;
+  width: 22px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #fff;
+  border-radius: 50%;
+  transition: 0.3s;
+  box-shadow: 0 1px 3px #0004;
+}
+
+.toggle input:checked + .toggle-slider {
+  background-color: #4CAF50;
+}
+
+.toggle input:checked + .toggle-slider::before {
+  transform: translateX(22px);
+}
+
+/* ---------- Environment visuals ---------- */
+
+/* Temperature thermometer */
+.thermo {
+  width: 60px;
+  height: 200px;
+  background: #ddd;
+  border-radius: 30px;
+  position: relative;
+  margin: 10px auto;
+  overflow: hidden;
+}
+.thermo-fill {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  background: #ff4d4d;
+  transition: height 0.3s;
+}
+
+/* Humidity droplet */
+.humidity-icon {
+  width: 80px;
+  height: 110px;
+  margin: 20px auto;
+  position: relative;
+}
+.humidity-drop {
+  width: 80px;
+  height: 110px;
+  background: #b3e5fc;
+  border-radius: 50% 50% 60% 60%;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 10px #90caf9 inset;
+}
+.humidity-fill {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 0%;
+  background: #0288d1;
+  animation: humidityPulse 2s infinite ease-in-out;
+  transition: height 0.3s;
+}
+@keyframes humidityPulse {
+  0%   { opacity: 0.8; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.8; }
+}
+
+/* Soil wetness */
+.soil-box {
+  width: 120px;
+  height: 120px;
+  border: 3px solid #5d4037;
+  border-radius: 10px;
+  margin: 20px auto;
+  position: relative;
+  overflow: hidden;
+  background: #f3e5ab;
+}
+.soil-dots {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-image:
+    radial-gradient(#8d6e63 2px, transparent 2px),
+    radial-gradient(#795548 2px, transparent 2px),
+    radial-gradient(#6d4c41 2px, transparent 2px);
+  background-size: 12px 12px, 18px 18px, 15px 15px;
+  background-position: 0 0, 5px 10px, 10px 5px;
+  opacity: 0.8;
+}
+.soil-water {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  height: 0%;
+  background: rgba(33, 150, 243, 0.6);
+  transition: height 0.4s ease;
+}
+
+/* Light sensor sun-style horizontal meter */
+.sun-meter-box {
+  width: 220px;
+  height: 30px;
+  background: #fff8e1;
+  border-radius: 20px;
+  margin: 20px auto;
+  position: relative;
+  overflow: hidden;
+  border: 2px solid #ffca28;
+  box-shadow: 0 0 10px #ffeb3b inset;
+}
+.sun-meter-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(to right,
+    #fff59d,
+    #ffe082,
+    #ffca28,
+    #ffb300
+  );
+  transition: width 0.4s ease;
+}
+
+/* ---------- Pump speedometer ---------- */
+.speedometer-container {
+  width: 260px;
+  height: 140px;
+  margin: 15px auto 5px;
+  position: relative;
+}
+
+.speedometer-arc {
+  width: 100%;
+  height: 100%;
+  border-radius: 260px 260px 0 0;
+  background: conic-gradient(
+    from 180deg,
+    #f44336,
+    #ff9800,
+    #ffeb3b
+  );
+  mask: radial-gradient(circle at 50% 100%, transparent 58%, black 59%);
+  -webkit-mask: radial-gradient(circle at 50% 100%, transparent 58%, black 59%);
+}
+
+/* background for ticks/inner */
+.speedometer-inner {
+  position: absolute;
+  left: 15px;
+  right: 15px;
+  top: 15px;
+  bottom: 0;
+  border-radius: 260px 260px 0 0;
+  background: #222;
+  mask: radial-gradient(circle at 50% 100%, transparent 58%, black 59%);
+  -webkit-mask: radial-gradient(circle at 50% 100%, transparent 58%, black 59%);
+}
+
+/* tick marks */
+.speedometer-ticks {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+.speedometer-ticks div {
+  position: absolute;
+  width: 2px;
+  height: 12px;
+  background: #eee;
+  left: 50%;
+  top: 18px;
+  transform-origin: center 90px; /* pivot near center of arc */
+}
+
+/* needle */
+.speedometer-needle {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 4px;
+  height: 80px;
+  background: #ffeb3b;
+  transform-origin: center bottom;
+  transform: rotate(-90deg);
+  transition: transform 0.15s linear;
+  pointer-events: none;
+}
+
+.speedometer-knob {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #f5f5f5;
+  border: 3px solid #ffeb3b;
+  transform: translateX(-50%) translateY(12px);
+  box-shadow: 0 0 6px #0008;
+  cursor: grab;
+}
+
+/* numeric display */
+.speedometer-value {
+  text-align: center;
+  margin-top: 4px;
+  font-weight: bold;
+}
+
+/* ---------- Vertical LED brightness slider ---------- */
+.vertical-slider-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.vertical-slider-box {
+  width: 40px;
+  height: 180px;
+  background: #e0e0e0;
+  border-radius: 20px;
+  position: relative;
+  overflow: hidden;
+}
+.vertical-slider-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 0%;
+  background: linear-gradient(to top, #ffcc80, #ff9800);
+  transition: height 0.2s;
+}
+.vertical-slider-thumb {
+  position: absolute;
+  left: 50%;
+  width: 34px;
+  height: 10px;
+  background: #ffffff;
+  border-radius: 6px;
+  box-shadow: 0 0 5px #0005;
+  transform: translateX(-50%) translateY(50%);
+  cursor: grab;
+}
+
+/* ---------- Threshold inputs ---------- */
+.threshold-row {
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.threshold-row input[type=number] {
+  width: 80px;
+  padding: 4px;
+}
+.threshold-row button {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: #1976d2;
+  color: white;
+  cursor: pointer;
+}
+
+/* ---------- Misc ---------- */
+.small-label {
+  font-size: 12px;
+  color: #666;
+}
+
 </style>
 </head>
+
 <body>
-<h1>Smart Garden ESP32</h1>
-<div class="row">
-  <button id="connect">Connect</button>
-  <span id="status" class="badge">Disconnected</span>
+
+<h2>🌱 Smart Garden BLE Dashboard</h2>
+<button id="connectBtn">Connect to SmartGardenESP32</button>
+
+<!-- ENVIRONMENT CARD -->
+<div class="card">
+  <h3>Environment</h3>
+  <div style="display:flex; justify-content:space-around; align-items:flex-start; flex-wrap:wrap;">
+
+    <!-- Temperature -->
+    <div style="text-align:center; margin:10px;">
+      <h4>Temperature (0–100)</h4>
+      <div class="thermo">
+        <div class="thermo-fill" id="thermoFill"></div>
+      </div>
+      <p><b><span id="temp">--</span> °</b></p>
+    </div>
+
+    <!-- Humidity -->
+    <div style="text-align:center; margin:10px;">
+      <h4>Humidity (0–100)</h4>
+      <div class="humidity-icon">
+        <div class="humidity-drop">
+          <div class="humidity-fill" id="humidityFill"></div>
+        </div>
+      </div>
+      <p><b><span id="hum">--</span> %</b></p>
+    </div>
+
+    <!-- Soil Wetness -->
+    <div style="text-align:center; margin:10px;">
+      <h4>Soil Wetness (0–100%)</h4>
+      <div class="soil-box">
+        <div class="soil-water" id="soilWater"></div>
+        <div class="soil-dots"></div>
+      </div>
+      <p><b><span id="soilPercent">--</span>%</b></p>
+    </div>
+
+    <!-- Light Sensor -->
+    <div style="text-align:center; margin:10px;">
+      <h4>Light Level (0–100%)</h4>
+      <div class="sun-meter-box">
+        <div class="sun-meter-fill" id="lightMeter"></div>
+      </div>
+      <p><b><span id="lightPercent">--</span>%</b></p>
+    </div>
+
+  </div>
 </div>
 
-<div class="grid">
-  <div class="card">
-    <h2>Telemetry</h2>
-    <div class="row"><span>Soil:</span><b id="m">—</b></div>
-    <div class="row"><span>Light:</span><b id="l">—</b></div>
-    <div class="row"><span>Pump duty:</span><b id="p">—</b></div>
-    <div class="row"><span>Pump ON:</span><span id="p_on" class="badge">—</span></div>
-    <div class="row"><span>LED duty:</span><b id="s">—</b></div>
-    <div class="row"><span>LED ON:</span><span id="s_on" class="badge">—</span></div>
-    <div class="row"><span>Override:</span><span id="o" class="badge">—</span></div>
+<div class="cards-row">
+
+  <!-- PUMP CONTROL CARD -->
+  <div class="card card-half">
+    <h3>Pump Control</h3>
+
+    <!-- Pump toggle -->
+    <div class="toggle-wrapper">
+      <div class="toggle-label-text">Pump Power</div>
+      <label class="toggle">
+        <input type="checkbox" id="pumpToggle">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="small-label">Toggle controls ON/OFF, speedometer sets speed (0–255).</div>
+
+    <!-- Speedometer -->
+    <div class="speedometer-container" id="speedometer">
+      <div class="speedometer-arc"></div>
+      <div class="speedometer-inner"></div>
+      <div class="speedometer-ticks" id="speedometerTicks"></div>
+
+      <div class="speedometer-needle" id="speedometerNeedle"></div>
+      <div class="speedometer-knob" id="speedometerKnob"></div>
+    </div>
+    <div class="speedometer-value">
+      Pump Speed: <span id="pumpSpeedVal">0</span> (0–255)
+    </div>
   </div>
 
-  <div class="card">
-    <h2>Manual Controls</h2>
-    <div class="row"><button onclick="sendCmd('OVERRIDE_ON')">Override ON</button><button onclick="sendCmd('OVERRIDE_OFF')">Override OFF</button></div>
-    <div class="row"><button onclick="sendCmd('PUMP_ON')">Pump ON</button><button onclick="sendCmd('PUMP_OFF')">Pump OFF</button></div>
-    <div class="row"><button onclick="sendCmd('LED_ON')">LED ON</button><button onclick="sendCmd('LED_OFF')">LED OFF</button></div>
-    <div class="row">
-      <label>Pump duty:</label><input id="pumpDuty" type="number" min="0" max="255" value="180">
-      <button onclick="setPump()">Set</button>
+  <!-- LED CONTROL CARD -->
+  <div class="card card-half">
+    <h3>LED Grow Light</h3>
+
+    <!-- LED toggle -->
+    <div class="toggle-wrapper">
+      <div class="toggle-label-text">LED Power</div>
+      <label class="toggle">
+        <input type="checkbox" id="ledToggle">
+        <span class="toggle-slider"></span>
+      </label>
     </div>
-    <div class="row">
-      <label>LED duty:</label><input id="ledDuty" type="number" min="0" max="255" value="255">
-      <button onclick="setLed()">Set</button>
+    <div class="small-label">Toggle controls ON/OFF, slider sets brightness (0–255).</div>
+
+    <!-- Vertical brightness slider -->
+    <div class="vertical-slider-wrapper">
+      <div class="vertical-slider-box" id="ledSliderBox">
+        <div class="vertical-slider-fill" id="ledSliderFill"></div>
+        <div class="vertical-slider-thumb" id="ledSliderThumb"></div>
+      </div>
+      <div><b>Brightness: <span id="ledVal">0</span></b></div>
     </div>
   </div>
 
-  <div class="card">
-    <h2>Thresholds</h2>
-    <div class="row"><label>Moisture:</label><input id="moist" type="number" min="0" max="4095" value="2500"><button onclick="setThresh('SET_MOISTURE_THRESH', 'moist')">Apply</button></div>
-    <div class="row"><label>Light:</label><input id="light" type="number" min="0" max="4095" value="1000"><button onclick="setThresh('SET_LIGHT_THRESH', 'light')">Apply</button></div>
+</div>
+
+<!-- MANUAL OVERDRIVE CARD -->
+<div class="card">
+  <h3>Manual Overdrive</h3>
+  <div class="toggle-wrapper">
+    <div class="toggle-label-text">Manual Overdrive</div>
+    <label class="toggle">
+      <input type="checkbox" id="overdriveToggle">
+      <span class="toggle-slider"></span>
+    </label>
+  </div>
+  <div class="small-label">
+    When enabled, automation is disabled and manual controls (pump, LED, etc.) take priority.
+  </div>
+</div>
+
+<!-- THRESHOLDS CARD -->
+<div class="card">
+  <h3>Automation Thresholds</h3>
+
+  <div class="threshold-row">
+    <span><b>Soil Dry Threshold:</b></span>
+    <input type="number" id="soilThresh" />
+    <button onclick="sendThreshold('SET_MOISTURE_THRESH')">Set</button>
+  </div>
+
+  <div class="threshold-row">
+    <span><b>Temperature High Threshold:</b></span>
+    <input type="number" id="tempThresh" />
+    <button onclick="sendThreshold('SET_TEMP_THRESH')">Set</button>
+  </div>
+
+  <div class="threshold-row">
+    <span><b>Humidity Low Threshold:</b></span>
+    <input type="number" id="humThresh" />
+    <button onclick="sendThreshold('SET_HUM_THRESH')">Set</button>
+  </div>
+
+  <div class="threshold-row">
+    <span><b>Light Low Threshold:</b></span>
+    <input type="number" id="lightThresh" />
+    <button onclick="sendThreshold('SET_LIGHT_THRESH')">Set</button>
   </div>
 </div>
 
 <script>
-const NAME = "SmartGardenESP32";
-const SERVICE = "4e520001-3c8c-4824-8f7d-2b4421d8b63e";
-const DATA    = "4e520002-3c8c-4824-8f7d-2b4421d8b63e";
-const CMD     = "4e520003-3c8c-4824-8f7d-2b4421d8b63e";
-let cmdChar, dataChar;
+/* ---------- BLE UUIDs ---------- */
+const SERVICE_UUID = "4e520001-3c8c-4824-8f7d-2b4421d8b63e";
+const DATA_UUID    = "4e520002-3c8c-4824-8f7d-2b4421d8b63e";
+const CMD_UUID     = "4e520003-3c8c-4824-8f7d-2b4421d8b63e";
 
-const $ = id => document.getElementById(id);
-const setStatus = c => { $("status").textContent = c ? "Connected" : "Disconnected"; $("status").className = "badge " + (c ? "ok" : ""); };
+let device, server, service;
+let dataChar, cmdChar;
 
-$("connect").onclick = async () => {
+/* ---------- Connect ---------- */
+document.getElementById("connectBtn").onclick = async () => {
   try {
-    const dev = await navigator.bluetooth.requestDevice({ filters: [{ name: NAME }], optionalServices: [SERVICE] });
-    const server = await dev.gatt.connect();
-    const svc = await server.getPrimaryService(SERVICE);
-    dataChar = await svc.getCharacteristic(DATA);
-    cmdChar  = await svc.getCharacteristic(CMD);
-    await dataChar.startNotifications();
-    dataChar.addEventListener("characteristicvaluechanged", e => {
-      const txt = new TextDecoder().decode(e.target.value);
-      try {
-        const o = JSON.parse(txt);
-        $("m").textContent = o.M;
-        $("l").textContent = o.L;
-        $("p").textContent = o.P;
-        $("s").textContent = o.S;
-        $("p_on").textContent = o.P_ON ? "ON" : "OFF";
-        $("p_on").className = "badge " + (o.P_ON ? "ok" : "");
-        $("s_on").textContent = o.S_ON ? "ON" : "OFF";
-        $("s_on").className = "badge " + (o.S_ON ? "ok" : "");
-        $("o").textContent = o.O ? "ON" : "OFF";
-        $("o").className = "badge " + (o.O ? "warn" : "");
-      } catch (err) { console.warn("Bad JSON:", txt, err); }
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{ name: "SmartGardenESP32" }],
+      optionalServices: [SERVICE_UUID]
     });
-    dev.addEventListener("gattserverdisconnected", () => setStatus(false));
-    setStatus(true);
-  } catch (err) {
-    alert("Connect failed: " + err);
-    setStatus(false);
+
+    server = await device.gatt.connect();
+    service = await server.getPrimaryService(SERVICE_UUID);
+    dataChar = await service.getCharacteristic(DATA_UUID);
+    cmdChar  = await service.getCharacteristic(CMD_UUID);
+
+    await dataChar.startNotifications();
+    dataChar.addEventListener("characteristicvaluechanged", handleNotify);
+
+    alert("Connected!");
+  } catch (e) {
+    alert("Connection Failed: " + e);
   }
 };
 
-async function sendCmd(s) {
-  if (!cmdChar) return alert("Not connected");
-  await cmdChar.writeValue(new TextEncoder().encode(s));
+/* ---------- Notification handler ---------- */
+function handleNotify(event) {
+  const text = new TextDecoder().decode(event.target.value);
+  try {
+    const d = JSON.parse(text);
+
+    /* Temperature */
+    const temp = clamp(d.T, 0, 100);
+    document.getElementById("temp").innerText = temp.toFixed(0);
+    document.getElementById("thermoFill").style.height = temp + "%";
+
+    /* Humidity */
+    const hum = clamp(d.H, 0, 100);
+    document.getElementById("hum").innerText = hum.toFixed(0);
+    document.getElementById("humidityFill").style.height = hum + "%";
+
+    /* Soil wetness: assume raw 0–3500 → 0–100% */
+    let soilRaw = d.M;
+    let soilPercent = clamp((soilRaw / 3500) * 100, 0, 100);
+    document.getElementById("soilPercent").innerText = soilPercent.toFixed(0);
+    document.getElementById("soilWater").style.height = soilPercent + "%";
+
+    /* Light sensor: raw 0–4096 → 0–100% */
+    let lightRaw = d.L;
+    let lightPercent = clamp((lightRaw / 4096) * 100, 0, 100);
+    document.getElementById("lightPercent").innerText = lightPercent.toFixed(0);
+    document.getElementById("lightMeter").style.width = lightPercent + "%";
+
+    /* Pump speed (0–255) -> update speedometer + display */
+    let pumpSpeed = clamp(d.P, 0, 255);
+    setPumpSpeedUI(pumpSpeed);
+
+    /* LED brightness (0–255) -> update vertical slider */
+    let ledVal = clamp(d.S, 0, 255);
+    setLEDSliderUI(ledVal);
+
+  } catch (err) {
+    console.log("Invalid JSON:", text);
+  }
 }
-function setPump() {
-  const v = parseInt($("pumpDuty").value, 10);
-  if (isNaN(v) || v < 0 || v > 255) return alert("Pump duty 0–255");
-  sendCmd("SET_PUMP_SPEED:" + v);
+
+/* ---------- Utility ---------- */
+function clamp(v, min, max) {
+  return Math.min(max, Math.max(min, v));
 }
-function setLed() {
-  const v = parseInt($("ledDuty").value, 10);
-  if (isNaN(v) || v < 0 || v > 255) return alert("LED duty 0–255");
-  sendCmd("SET_LED_BRIGHTNESS:" + v);
+
+async function sendCmd(cmd) {
+  if (!cmdChar) {
+    alert("Not connected!");
+    return;
+  }
+  try {
+    await cmdChar.writeValue(new TextEncoder().encode(cmd));
+  } catch (e) {
+    console.log("sendCmd error:", e);
+  }
 }
-function setThresh(cmd, id) {
+
+/* ---------- Pump speedometer logic ---------- */
+
+const needle = document.getElementById("speedometerNeedle");
+const knob = document.getElementById("speedometerKnob");
+const speedDisplay = document.getElementById("pumpSpeedVal");
+const pumpToggle = document.getElementById("pumpToggle");
+
+let isDraggingNeedle = false;
+let currentPumpSpeed = 0; // 0–255
+
+// create tick marks (0–180 deg every 15 deg)
+(function createTicks() {
+  const ticksContainer = document.getElementById("speedometerTicks");
+  const steps = 12; // 0..180 step 15
+  for (let i = 0; i <= steps; i++) {
+    const tick = document.createElement("div");
+    const angle = -90 + (i * (180 / steps)); // -90..+90
+    tick.style.transform = `rotate(${angle}deg) translateX(-50%)`;
+    ticksContainer.appendChild(tick);
+  }
+})();
+
+/* Map speed (0–255) to angle (-90..+90) */
+function speedToAngle(speed) {
+  return -90 + (speed / 255) * 180;
+}
+
+/* Map angle (-90..+90) to speed (0..255) */
+function angleToSpeed(angle) {
+  const clamped = clamp(angle, -90, 90);
+  return Math.round(((clamped + 90) / 180) * 255);
+}
+
+function setPumpSpeedUI(speed) {
+  currentPumpSpeed = clamp(speed, 0, 255);
+  const angle = speedToAngle(currentPumpSpeed);
+  needle.style.transform = `rotate(${angle}deg)`;
+  speedDisplay.textContent = currentPumpSpeed;
+}
+
+/* send pump speed command if pump is ON */
+function sendPumpSpeed() {
+  if (pumpToggle.checked) {
+    sendCmd("SET_PUMP_SPEED:" + currentPumpSpeed);
+  }
+}
+
+/* dragging logic (must grab knob) */
+function onNeedlePointerDown(e) {
+  e.preventDefault();
+  isDraggingNeedle = true;
+  knob.style.cursor = "grabbing";
+}
+
+function onNeedlePointerMove(e) {
+  if (!isDraggingNeedle) return;
+
+  const rect = knob.parentElement.getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.bottom; // bottom center as pivot
+
+  const x = e.clientX - centerX;
+  const y = e.clientY - centerY;
+
+  // angle from -90 (left) to +90 (right)
+  let angle = Math.atan2(-y, x) * (180 / Math.PI); // convert to degrees relative to +x
+  // but we want pivot at bottom pointing up. We approximate using geometry:
+  // compute angle relative to vertical:
+  angle = Math.atan2(x, -y) * (180 / Math.PI);
+
+  angle = clamp(angle, -90, 90);
+
+  const newSpeed = angleToSpeed(angle);
+  setPumpSpeedUI(newSpeed);
+}
+
+function onNeedlePointerUp() {
+  if (isDraggingNeedle) {
+    isDraggingNeedle = false;
+    knob.style.cursor = "grab";
+    sendPumpSpeed();
+  }
+}
+
+knob.addEventListener("pointerdown", onNeedlePointerDown);
+window.addEventListener("pointermove", onNeedlePointerMove);
+window.addEventListener("pointerup", onNeedlePointerUp);
+
+/* Pump toggle: ON/OFF */
+pumpToggle.addEventListener("change", () => {
+  if (pumpToggle.checked) {
+    sendCmd("PUMP_ON");
+    // also send speed
+    sendPumpSpeed();
+  } else {
+    sendCmd("PUMP_OFF");
+  }
+});
+
+/* ---------- LED vertical slider logic ---------- */
+
+const ledSliderBox = document.getElementById("ledSliderBox");
+const ledFill = document.getElementById("ledSliderFill");
+const ledThumb = document.getElementById("ledSliderThumb");
+const ledValLabel = document.getElementById("ledVal");
+const ledToggle = document.getElementById("ledToggle");
+
+let isDraggingLED = false;
+let currentLEDVal = 0; // 0–255
+
+function setLEDSliderUI(value) {
+  currentLEDVal = clamp(value, 0, 255);
+  const pct = (currentLEDVal / 255) * 100;
+  ledFill.style.height = pct + "%";
+
+  const boxRect = ledSliderBox.getBoundingClientRect();
+  const thumbY = boxRect.height - (boxRect.height * pct / 100);
+  ledThumb.style.top = thumbY + "px";
+
+  ledValLabel.textContent = currentLEDVal;
+}
+
+/* send LED brightness if LED is ON */
+function sendLEDBrightness() {
+  if (ledToggle.checked) {
+    sendCmd("SET_LED_BRIGHTNESS:" + currentLEDVal);
+  }
+}
+
+function ledPointerToValue(e) {
+  const rect = ledSliderBox.getBoundingClientRect();
+  const y = e.clientY - rect.top;
+  const pct = clamp(1 - y / rect.height, 0, 1);
+  const val = Math.round(pct * 255);
+  setLEDSliderUI(val);
+}
+
+/* dragging behavior */
+ledThumb.addEventListener("pointerdown", (e) => {
+  e.preventDefault();
+  isDraggingLED = true;
+  ledThumb.style.cursor = "grabbing";
+});
+
+window.addEventListener("pointermove", (e) => {
+  if (!isDraggingLED) return;
+  ledPointerToValue(e);
+});
+
+window.addEventListener("pointerup", () => {
+  if (isDraggingLED) {
+    isDraggingLED = false;
+    ledThumb.style.cursor = "grab";
+    sendLEDBrightness();
+  }
+});
+
+/* allow click on the slider box to jump brightness */
+ledSliderBox.addEventListener("pointerdown", (e) => {
+  ledPointerToValue(e);
+  sendLEDBrightness();
+});
+
+/* LED toggle */
+ledToggle.addEventListener("change", () => {
+  if (ledToggle.checked) {
+    sendCmd("LED_ON");
+    sendLEDBrightness();
+  } else {
+    sendCmd("LED_OFF");
+  }
+});
+
+/* ---------- Manual Overdrive toggle ---------- */
+const overdriveToggle = document.getElementById("overdriveToggle");
+
+overdriveToggle.addEventListener("change", () => {
+  if (overdriveToggle.checked) {
+    sendCmd("OVERDRIVE_ON");
+  } else {
+    sendCmd("OVERDRIVE_OFF");
+  }
+});
+
+/* ---------- Thresholds ---------- */
+function sendThreshold(cmd) {
+  const id = cmd.replace("SET_", "").toLowerCase() + "Thresh";
   const val = document.getElementById(id).value;
+  if (val === "") return;
   sendCmd(cmd + ":" + val);
 }
 </script>
+
 </body>
 </html>

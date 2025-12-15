@@ -290,6 +290,7 @@ h2, h3 {
 
 <h2>🌱 Smart Garden BLE Dashboard</h2>
 <button id="connectBtn">Connect to SmartGardenESP32</button>
+<span id="deviceName" style="margin-left:12px; font-weight:bold;"></span>
 
 <!-- ENVIRONMENT CARD -->
 <div class="card">
@@ -354,7 +355,7 @@ h2, h3 {
       <div class="speedometer-inner"></div>
       <div class="speedometer-ticks" id="speedometerTicks"></div>
       <div class="speedometer-needle" id="speedometerNeedle"></div>
-      <div class="speedometer-knob" id="speedometerKnob"></div>
+      <div class="speedometer-knob" id="speedometerKnob" tabindex="0" role="slider" aria-valuemin="0" aria-valuemax="255"></div>
     </div>
 
     <div class="speedometer-value">
@@ -376,7 +377,7 @@ h2, h3 {
 
     <div class="vertical-slider-box" id="ledSliderBox">
       <div class="vertical-slider-fill" id="ledSliderFill"></div>
-      <div class="vertical-slider-thumb" id="ledSliderThumb"></div>
+      <div class="vertical-slider-thumb" id="ledSliderThumb" tabindex="0" role="slider" aria-valuemin="0" aria-valuemax="255"></div>
     </div>
 
     <div style="text-align:center;">
@@ -402,16 +403,16 @@ h2, h3 {
 <div class="card">
   <h3>Automation Thresholds</h3>
 
-  <div class="threshold-row">
+  <div class="threshold-row" style="margin-bottom:10px;">
     <span><b>Soil Dry Threshold:</b></span>
-    <input type="number" id="soilThresh" />
-    <button onclick="sendThreshold('SET_MOISTURE_THRESH')">Set</button>
+    <input type="number" id="soilThresh" style="width:80px; margin-left:8px;" />
+    <button id="setSoilThreshBtn" style="margin-left:8px;">Set</button>
   </div>
 
   <div class="threshold-row">
     <span><b>Light Low Threshold:</b></span>
-    <input type="number" id="lightThresh" />
-    <button onclick="sendThreshold('SET_LIGHT_THRESH')">Set</button>
+    <input type="number" id="lightThresh" style="width:80px; margin-left:8px;" />
+    <button id="setLightThreshBtn" style="margin-left:8px;">Set</button>
   </div>
 
 </div>
@@ -422,85 +423,277 @@ const SERVICE_UUID = "4e520001-3c8c-4824-8f7d-2b4421d8b63e";
 const DATA_UUID    = "4e520002-3c8c-4824-8f7d-2b4421d8b63e";
 const CMD_UUID     = "4e520003-3c8c-4824-8f7d-2b4421d8b63e";
 
-let device, server, service;
-let dataChar, cmdChar;
+let device = null;
+let server = null;
+let service = null;
+let dataChar = null;
+let cmdChar = null;
 
-/* ---------- Connect ---------- */
-document.getElementById("connectBtn").onclick = async () => {
-  try {
-    device = await navigator.bluetooth.requestDevice({
-      filters: [{ name: "SmartGardenESP32" }],
-      optionalServices: [SERVICE_UUID]
-    });
+/* ---------- Notification buffer for chunked payloads ---------- */
+let notifyBuffer = "";
 
-    server = await device.gatt.connect();
-    service = await server.getPrimaryService(SERVICE_UUID);
-    dataChar = await service.getCharacteristic(DATA_UUID);
-    cmdChar  = await service.getCharacteristic(CMD_UUID);
+/* ---------- UI Elements ---------- */
+const connectBtn = document.getElementById("connectBtn");
+const deviceNameLabel = document.getElementById("deviceName");
 
-    await dataChar.startNotifications();
-    dataChar.addEventListener("characteristicvaluechanged", handleNotify);
-
-    alert("Connected!");
-  } catch (e) {
-    alert("Connection Failed: " + e);
-  }
-};
-
-/* ---------- Notification handler ---------- */
-function handleNotify(event) {
-  const text = new TextDecoder().decode(event.target.value);
-  try {
-    const d = JSON.parse(text);
-
-    /* Temperature */
-    document.getElementById("temp").innerText = d.T.toFixed(1);
-    document.getElementById("thermoFill").style.height = d.T + "%";
-
-    /* Humidity */
-    document.getElementById("hum").innerText = d.H.toFixed(1);
-    document.getElementById("humidityFill").style.height = d.H + "%";
-
-    /* Soil */
-    let soilPercent = (d.M / 4095) * 100;
-    document.getElementById("soilPercent").innerText = soilPercent.toFixed(0);
-    document.getElementById("soilWater").style.height = soilPercent + "%";
-
-    /* Light */
-    let lightPercent = (d.L / 4095) * 100;
-    document.getElementById("lightPercent").innerText = lightPercent.toFixed(0);
-    document.getElementById("lightMeter").style.width = lightPercent + "%";
-
-    /* Pump speed */
-    setPumpSpeedUI(d.P);
-
-    /* LED brightness */
-    setLEDSliderUI(d.S);
-
-  } catch (err) {
-    console.log("Invalid JSON:", text);
-  }
-}
-
-/* ---------- Utility ---------- */
-function clamp(v, min, max) {
-  return Math.min(max, Math.max(min, v));
-}
-
-async function sendCmd(cmd) {
-  if (!cmdChar) return alert("Not connected!");
-  await cmdChar.writeValue(new TextEncoder().encode(cmd));
-}
-
-/* ---------- Pump Speedometer ---------- */
 const needle = document.getElementById("speedometerNeedle");
 const knob = document.getElementById("speedometerKnob");
 const speedDisplay = document.getElementById("pumpSpeedVal");
 const pumpToggle = document.getElementById("pumpToggle");
 
+const ledSliderBox = document.getElementById("ledSliderBox");
+const ledFill = document.getElementById("ledSliderFill");
+const ledThumb = document.getElementById("ledSliderThumb");
+const ledValLabel = document.getElementById("ledVal");
+const ledToggle = document.getElementById("ledToggle");
+
+const overdriveToggle = document.getElementById("overdriveToggle");
+
 let isDraggingNeedle = false;
 let currentPumpSpeed = 0;
 
+let isDraggingLED = false;
+let currentLEDVal = 0;
+
+/* ---------- Helpers ---------- */
+function clamp(v, min, max) {
+  return Math.min(max, Math.max(min, v));
+}
+function logBLE(msg) {
+  console.log("[BLE] " + msg);
+}
+function isWebBluetoothSupported() {
+  return !!(navigator && navigator.bluetooth);
+}
+
+/* ---------- Connect ---------- */
+connectBtn.addEventListener("click", async () => {
+  if (!isWebBluetoothSupported()) {
+    alert("Web Bluetooth API is not available in this browser. Use Chrome or Edge on a supported platform.");
+    return;
+  }
+
+  connectBtn.disabled = true;
+  connectBtn.textContent = "Connecting...";
+
+  try {
+    // Prefer service filter; also accept namePrefix for convenience.
+    device = await navigator.bluetooth.requestDevice({
+      filters: [
+        { services: [SERVICE_UUID] },
+        { namePrefix: "SmartGarden" }
+      ],
+      optionalServices: [SERVICE_UUID]
+    });
+
+    if (!device) {
+      throw new Error("No device selected");
+    }
+
+    device.addEventListener('gattserverdisconnected', onDisconnected);
+
+    server = await device.gatt.connect();
+    service = await server.getPrimaryService(SERVICE_UUID);
+
+    // Get characteristics
+    dataChar = await service.getCharacteristic(DATA_UUID);
+    cmdChar  = await service.getCharacteristic(CMD_UUID);
+
+    // Start notifications if supported
+    if (dataChar.properties.notify || dataChar.properties.indicate) {
+      try {
+        await dataChar.startNotifications();
+        dataChar.addEventListener("characteristicvaluechanged", handleNotify);
+      } catch (e) {
+        console.warn("startNotifications failed:", e);
+      }
+    } else {
+      console.warn("Data characteristic has no notify/indicate property");
+    }
+
+    deviceNameLabel.textContent = device.name ? `(${device.name})` : '';
+    connectBtn.textContent = "Connected";
+    connectBtn.style.background = "#999";
+    connectBtn.disabled = true;
+    logBLE("Connected to device: " + (device.name || device.id));
+  } catch (e) {
+    console.error("Connection Failed:", e);
+    alert("Connection failed: " + (e.message || e));
+    connectBtn.disabled = false;
+    connectBtn.textContent = "Connect to SmartGardenESP32";
+  }
+});
+
+/* ---------- Disconnection / Reconnect ---------- */
+function onDisconnected(evt) {
+  logBLE("Device disconnected");
+  alert("Device disconnected");
+  connectBtn.disabled = false;
+  connectBtn.textContent = "Connect to SmartGardenESP32";
+  connectBtn.style.background = "";
+  deviceNameLabel.textContent = "";
+
+  // Optionally attempt automatic reconnect a few times
+  tryReconnect(3, 1500).catch(() => {
+    logBLE("Auto-reconnect attempts finished");
+  });
+}
+
+async function tryReconnect(retries = 3, delayMs = 1500) {
+  if (!device) return;
+  for (let i = 0; i < retries; i++) {
+    try {
+      logBLE(`Reconnect attempt ${i+1}/${retries}`);
+      server = await device.gatt.connect();
+      service = await server.getPrimaryService(SERVICE_UUID);
+      dataChar = await service.getCharacteristic(DATA_UUID);
+      cmdChar  = await service.getCharacteristic(CMD_UUID);
+
+      if (dataChar.properties.notify || dataChar.properties.indicate) {
+        await dataChar.startNotifications();
+        dataChar.addEventListener("characteristicvaluechanged", handleNotify);
+      }
+
+      connectBtn.disabled = true;
+      connectBtn.textContent = "Connected";
+      connectBtn.style.background = "#999";
+      deviceNameLabel.textContent = device.name ? `(${device.name})` : '';
+      alert("Reconnected to device");
+      return;
+    } catch (err) {
+      console.warn("Reconnect failed:", err);
+      await new Promise(r => setTimeout(r, delayMs));
+    }
+  }
+  // If reconnect unsuccessful, leave UI disconnected
+  connectBtn.disabled = false;
+  connectBtn.textContent = "Connect to SmartGardenESP32";
+  deviceNameLabel.textContent = "";
+  throw new Error("Unable to reconnect");
+}
+
+/* ---------- Notification handler (robust for chunked payloads) ---------- */
+function decodeValueToString(value) {
+  // value is a DataView
+  if (value && value.buffer) {
+    const slice = value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength);
+    return new TextDecoder().decode(slice);
+  }
+  return new TextDecoder().decode(value);
+}
+
+function handleNotify(event) {
+  const raw = decodeValueToString(event.target.value);
+  // Many devices stream JSON with newline-delimited records (NDJSON).
+  // Accumulate partial chunks in notifyBuffer and parse complete lines.
+  notifyBuffer += raw;
+  let newlineIndex;
+  while ((newlineIndex = notifyBuffer.indexOf("\n")) !== -1) {
+    const line = notifyBuffer.slice(0, newlineIndex).trim();
+    notifyBuffer = notifyBuffer.slice(newlineIndex + 1);
+    if (!line) continue;
+    try {
+      const d = JSON.parse(line);
+      updateUIFromData(d);
+    } catch (err) {
+      console.warn("Failed to parse JSON from notification line:", line, err);
+      // If not NDJSON but a full JSON in one chunk, try parsing the whole buffer (fallback)
+      try {
+        const d = JSON.parse(notifyBuffer.trim());
+        notifyBuffer = "";
+        updateUIFromData(d);
+      } catch (e2) {
+        // ignore; wait for more data
+      }
+    }
+  }
+
+  // If there's no newline and the device sends whole JSON in a single chunk without newline,
+  // try to parse it as a whole (best-effort). This handles devices that don't use NDJSON.
+  if (notifyBuffer && notifyBuffer.indexOf("{") === 0 && notifyBuffer.indexOf("}") !== -1) {
+    try {
+      const possible = notifyBuffer.trim();
+      const d = JSON.parse(possible);
+      notifyBuffer = "";
+      updateUIFromData(d);
+    } catch (e) {
+      // not yet complete JSON; wait for more chunks
+    }
+  }
+}
+
+/* ---------- UI update logic from parsed data ---------- */
+function updateUIFromData(d) {
+  // Temperature (d.T expected in degrees Celsius)
+  if (typeof d.T === 'number') {
+    document.getElementById("temp").innerText = d.T.toFixed(1);
+    // Map temperature into 0-100% fill for visualization.
+    // Example mapping: -10°C -> 0%, 50°C -> 100%
+    const tPercent = clamp(Math.round(((d.T - (-10)) / (50 - (-10))) * 100), 0, 100);
+    document.getElementById("thermoFill").style.height = tPercent + "%";
+  }
+
+  // Humidity (d.H expected 0-100)
+  if (typeof d.H === 'number') {
+    const h = clamp(d.H, 0, 100);
+    document.getElementById("hum").innerText = h.toFixed(1);
+    document.getElementById("humidityFill").style.height = h + "%";
+  }
+
+  // Soil (d.M expected raw ADC 0-4095)
+  if (typeof d.M === 'number') {
+    let soilPercent = (d.M / 4095) * 100;
+    soilPercent = clamp(Math.round(soilPercent), 0, 100);
+    document.getElementById("soilPercent").innerText = soilPercent.toFixed(0);
+    document.getElementById("soilWater").style.height = soilPercent + "%";
+  }
+
+  // Light (d.L expected raw ADC 0-4095)
+  if (typeof d.L === 'number') {
+    let lightPercent = (d.L / 4095) * 100;
+    lightPercent = clamp(Math.round(lightPercent), 0, 100);
+    document.getElementById("lightPercent").innerText = lightPercent.toFixed(0);
+    document.getElementById("lightMeter").style.width = lightPercent + "%";
+  }
+
+  // Pump speed (d.P expected 0-255)
+  if (typeof d.P === 'number') {
+    setPumpSpeedUI(d.P);
+  }
+
+  // LED brightness (d.S expected 0-255)
+  if (typeof d.S === 'number') {
+    setLEDSliderUI(d.S);
+  }
+}
+
+/* ---------- Safe write helper (handles write vs writeWithoutResponse) ---------- */
+async function sendCmd(cmd) {
+  if (!cmdChar) {
+    alert("Not connected!");
+    return;
+  }
+  try {
+    const data = new TextEncoder().encode(cmd);
+    if (cmdChar.properties.write) {
+      await cmdChar.writeValue(data);
+    } else if (cmdChar.properties.writeWithoutResponse && typeof cmdChar.writeValueWithoutResponse === 'function') {
+      await cmdChar.writeValueWithoutResponse(data);
+    } else {
+      throw new Error("Characteristic not writable");
+    }
+    logBLE("Sent: " + cmd);
+  } catch (err) {
+    console.error("Write failed:", err);
+    alert("Failed to send command: " + (err.message || err));
+    // If disconnected, try to reconnect
+    if (device && !device.gatt.connected) {
+      tryReconnect().catch(() => {});
+    }
+  }
+}
+
+/* ---------- Pump Speedometer UI and interaction ---------- */
 function speedToAngle(speed) {
   return -90 + (speed / 255) * 180;
 }
@@ -509,18 +702,22 @@ function angleToSpeed(angle) {
 }
 
 function setPumpSpeedUI(speed) {
-  currentPumpSpeed = clamp(speed, 0, 255);
+  currentPumpSpeed = clamp(Math.round(speed), 0, 255);
   needle.style.transform = `rotate(${speedToAngle(currentPumpSpeed)}deg)`;
   speedDisplay.textContent = currentPumpSpeed;
+  knob.setAttribute("aria-valuenow", currentPumpSpeed);
 }
 
 function sendPumpSpeed() {
-  if (pumpToggle.checked) sendCmd("SET_PUMP_SPEED:" + currentPumpSpeed);
+  if (pumpToggle.checked) {
+    sendCmd("SET_PUMP_SPEED:" + currentPumpSpeed);
+  }
 }
 
 knob.addEventListener("pointerdown", e => {
   e.preventDefault();
   isDraggingNeedle = true;
+  knob.setPointerCapture(e.pointerId);
 });
 window.addEventListener("pointermove", e => {
   if (!isDraggingNeedle) return;
@@ -533,9 +730,10 @@ window.addEventListener("pointermove", e => {
   angle = clamp(angle, -90, 90);
   setPumpSpeedUI(angleToSpeed(angle));
 });
-window.addEventListener("pointerup", () => {
+window.addEventListener("pointerup", e => {
   if (isDraggingNeedle) {
     isDraggingNeedle = false;
+    try { knob.releasePointerCapture(e.pointerId); } catch {}
     sendPumpSpeed();
   }
 });
@@ -549,15 +747,133 @@ pumpToggle.addEventListener("change", () => {
   }
 });
 
-/* ---------- LED Slider ---------- */
-const ledSliderBox = document.getElementById("ledSliderBox");
-const ledFill = document.getElementById("ledSliderFill");
-const ledThumb = document.getElementById("ledSliderThumb");
-const ledValLabel = document.getElementById("ledVal");
-const ledToggle = document.getElementById("ledToggle");
-
-let isDraggingLED = false;
-let currentLEDVal = 0;
-
+/* ---------- LED Slider UI and interaction ---------- */
 function setLEDSliderUI(value) {
-  currentLEDVal = clamp(value,
+  currentLEDVal = clamp(Math.round(value), 0, 255);
+  const pct = Math.round((currentLEDVal / 255) * 100);
+  ledFill.style.height = pct + "%";
+  // Position the thumb: bottom offset is pct%
+  const boxHeight = ledSliderBox.clientHeight;
+  const thumbHeight = ledThumb.clientHeight || 10;
+  const bottomPx = (pct / 100) * (boxHeight - thumbHeight);
+  ledThumb.style.bottom = bottomPx + "px";
+  ledValLabel.textContent = currentLEDVal;
+  ledThumb.setAttribute("aria-valuenow", currentLEDVal);
+}
+
+function sendLEDVal() {
+  if (ledToggle.checked) {
+    sendCmd("SET_LED_BRIGHTNESS:" + currentLEDVal);
+  }
+}
+
+ledThumb.addEventListener("pointerdown", e => {
+  e.preventDefault();
+  isDraggingLED = true;
+  ledThumb.setPointerCapture(e.pointerId);
+});
+window.addEventListener("pointermove", e => {
+  if (!isDraggingLED) return;
+  const rect = ledSliderBox.getBoundingClientRect();
+  // y position relative to top of box
+  const y = clamp(e.clientY - rect.top, 0, rect.height);
+  // invert to get bottom percentage
+  const pct = clamp(Math.round((1 - (y / rect.height)) * 100), 0, 100);
+  const val = Math.round((pct / 100) * 255);
+  setLEDSliderUI(val);
+});
+window.addEventListener("pointerup", e => {
+  if (isDraggingLED) {
+    isDraggingLED = false;
+    try { ledThumb.releasePointerCapture(e.pointerId); } catch {}
+    sendLEDVal();
+  }
+});
+
+// Support clicking on the slider box to set value
+ledSliderBox.addEventListener("click", e => {
+  const rect = ledSliderBox.getBoundingClientRect();
+  const y = clamp(e.clientY - rect.top, 0, rect.height);
+  const pct = clamp(Math.round((1 - (y / rect.height)) * 100), 0, 100);
+  const val = Math.round((pct / 100) * 255);
+  setLEDSliderUI(val);
+  sendLEDVal();
+});
+
+ledToggle.addEventListener("change", () => {
+  if (ledToggle.checked) {
+    sendCmd("LED_ON");
+    sendLEDVal();
+  } else {
+    sendCmd("LED_OFF");
+  }
+});
+
+/* ---------- Manual overdrive ---------- */
+overdriveToggle.addEventListener("change", () => {
+  if (overdriveToggle.checked) {
+    sendCmd("OVERRIDE_ON");
+  } else {
+    sendCmd("OVERRIDE_OFF");
+  }
+});
+
+/* ---------- Thresholds ---------- */
+document.getElementById("setSoilThreshBtn").addEventListener("click", () => {
+  const v = Number(document.getElementById("soilThresh").value);
+  if (!Number.isFinite(v)) return alert("Enter a valid number for soil threshold");
+  // Send as percentage or raw? Use percentage for clarity
+  sendCmd("SET_MOISTURE_THRESH:" + clamp(Math.round(v), 0, 100));
+});
+
+document.getElementById("setLightThreshBtn").addEventListener("click", () => {
+  const v = Number(document.getElementById("lightThresh").value);
+  if (!Number.isFinite(v)) return alert("Enter a valid number for light threshold");
+  sendCmd("SET_LIGHT_THRESH:" + clamp(Math.round(v), 0, 100));
+});
+
+/* ---------- Initialization: generate speedometer ticks (visual) ---------- */
+(function drawTicks() {
+  const ticks = document.getElementById("speedometerTicks");
+  if (!ticks) return;
+  // create 9 ticks evenly spaced from -90 to +90
+  for (let i = 0; i <= 8; i++) {
+    const d = document.createElement("div");
+    const angle = -90 + (i / 8) * 180;
+    d.style.transform = `rotate(${angle}deg) translateY(-72px)`;
+    ticks.appendChild(d);
+  }
+})();
+
+/* ---------- Accessibility: keyboard control for knob and thumb ---------- */
+knob.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+    setPumpSpeedUI(currentPumpSpeed - 5);
+    sendPumpSpeed();
+    e.preventDefault();
+  } else if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+    setPumpSpeedUI(currentPumpSpeed + 5);
+    sendPumpSpeed();
+    e.preventDefault();
+  }
+});
+
+ledThumb.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown" || e.key === "ArrowLeft") {
+    setLEDSliderUI(currentLEDVal - 5);
+    sendLEDVal();
+    e.preventDefault();
+  } else if (e.key === "ArrowUp" || e.key === "ArrowRight") {
+    setLEDSliderUI(currentLEDVal + 5);
+    sendLEDVal();
+    e.preventDefault();
+  }
+});
+
+/* ---------- Initial UI defaults ---------- */
+setPumpSpeedUI(0);
+setLEDSliderUI(0);
+
+</script>
+</body>
+</html>

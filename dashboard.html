@@ -466,15 +466,6 @@ function isWebBluetoothSupported() {
   return !!(navigator && navigator.bluetooth);
 }
 
-/* ---------- BLE write queue to avoid "GATT operation already in progress" ---------- */
-const writeQueue = [];
-let writeInProgress = false;
-
-/**
- * Process the queue sequentially. Each queued item is { data, resolve, reject }.
- * Small pause between writes gives the peripheral time to process; adjust delay if needed.
- */
-// Improved write queue with retry/backoff
 const writeQueue = [];
 let writeInProgress = false;
 

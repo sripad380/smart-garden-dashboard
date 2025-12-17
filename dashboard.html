@@ -543,7 +543,7 @@ connectBtn.addEventListener("click", async () => {
   try {
     // Prefer service filter; also accept namePrefix for convenience.
     device = await navigator.bluetooth.requestDevice({
-      filters: [{ name: "SmartGardenESP32" }]
+      filters: [{ name: "SmartGardenESP32" }],
       optionalServices: [SERVICE_UUID]
     });
 

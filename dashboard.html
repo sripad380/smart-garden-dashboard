@@ -466,8 +466,11 @@ function isWebBluetoothSupported() {
   return !!(navigator && navigator.bluetooth);
 }
 
-const writeQueue = [];
-let writeInProgress = false;
+window.writeQueue = window.writeQueue || [];
+window.writeInProgress = window.writeInProgress || false;
+
+const writeQueue = window.writeQueue;
+let writeInProgress = window.writeInProgress;
 
 async function doWrite(characteristic, data, tryCount = 0) {
   // choose method
@@ -540,10 +543,7 @@ connectBtn.addEventListener("click", async () => {
   try {
     // Prefer service filter; also accept namePrefix for convenience.
     device = await navigator.bluetooth.requestDevice({
-      filters: [
-        { services: [SERVICE_UUID] },
-        { namePrefix: "SmartGarden" }
-      ],
+      filters: [{ name: "SmartGardenESP32" }]
       optionalServices: [SERVICE_UUID]
     });
 
@@ -643,6 +643,13 @@ function decodeValueToString(value) {
   return new TextDecoder().decode(value);
 }
 
+/**
+ * Notification handler for BLE device.
+ * Accumulates partial chunks of JSON received from notifications in notifyBuffer.
+ * When a complete JSON line is received, parses it and updates the UI.
+ * If the JSON is not newline-delimited (NDJSON), will attempt to parse the whole buffer as a single JSON object.
+ * @param {Event} event - The event containing the JSON data received from the device.
+ */
 function handleNotify(event) {
   const raw = decodeValueToString(event.target.value);
   // Many devices stream JSON with newline-delimited records (NDJSON).

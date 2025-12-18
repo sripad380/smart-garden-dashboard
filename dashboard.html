@@ -543,7 +543,7 @@ connectBtn.addEventListener("click", async () => {
   try {
     // Prefer service filter; also accept namePrefix for convenience.
     device = await navigator.bluetooth.requestDevice({
-      filters: [{ name: "SmartGardenESP32" }]
+      filters: [{ name: "SmartGardenESP32" }],
       optionalServices: [SERVICE_UUID]
     });
 
@@ -895,15 +895,17 @@ overdriveToggle.addEventListener("change", () => {
 /* ---------- Thresholds ---------- */
 document.getElementById("setSoilThreshBtn").addEventListener("click", () => {
   const v = Number(document.getElementById("soilThresh").value);
+  const l = map(v, 0, 100, 0, 3500);
   if (!Number.isFinite(v)) return alert("Enter a valid number for soil threshold");
   // Send as percentage or raw? Use percentage for clarity
-  sendCmd("SET_MOISTURE_THRESH:" + clamp(Math.round(v), 0, 100));
+  sendCmd("SET_MOISTURE_THRESH:" + Math.round(l));
 });
 
 document.getElementById("setLightThreshBtn").addEventListener("click", () => {
   const v = Number(document.getElementById("lightThresh").value);
+  const l = map(v, 0, 100, 0, 3500);
   if (!Number.isFinite(v)) return alert("Enter a valid number for light threshold");
-  sendCmd("SET_LIGHT_THRESH:" + clamp(Math.round(v), 0, 100));
+  sendCmd("SET_LIGHT_THRESH:" + Math.round(l));
 });
 
 /* ---------- Initialization: generate speedometer ticks (visual) ---------- */
